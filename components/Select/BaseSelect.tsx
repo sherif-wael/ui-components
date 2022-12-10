@@ -1,83 +1,37 @@
 import React from "react";
-import { cva, VariantProps } from "class-variance-authority";
-import { keepVisible } from "../../lib/keep-visible";
 import clsx from "clsx";
 import Portal from "../Portal";
-import { FaCaretDown as CaretIcon } from "react-icons/fa";
+import { getMenuStyles, scrollToOption } from "./Select.utils";
+import { MultipleSizeElement } from "@lib/types";
+import CaretIcon from "./CaretIcon";
 
-const select = cva(
-    "inline-flex items-center cursor-pointer disabled:cursor-not-allowed transition-all duration-300 w-full text-gray-700 relative z-[1]",
-    {
-        variants: {
-            variant: {
-                unstyled: "outline-none focus:outline-none active:outline-none",
-                outline:
-                    "px-2 rounded border border-gray-200 hover:border-gray-300 outline-none outline-offset-1 focus:outline-blue-400",
-            },
-            size: {
-                sm: "h-8 text-sm",
-                md: "h-10 text-md",
-                lg: "h-12 text-lg",
-            },
-            invalid: {
-                true: "",
-            },
-        },
-        compoundVariants: [
-            {
-                variant: "outline",
-                invalid: true,
-                className: "border-red-400 focus:outline-red-400",
-            },
-        ],
-        defaultVariants: {
-            size: "md",
-            variant: "outline",
-        },
-    }
-);
-
-type Option = {
+interface Option {
     label: React.ReactNode;
     value: string;
-};
-
-type SelectProps = Omit<JSX.IntrinsicElements["input"], "size"> &
-    VariantProps<typeof select> & {
-        options: Option[];
-        onChange?: (value: JSX.IntrinsicElements["input"]["value"]) => void;
-    };
-
-function getMenuStyles(wrapper: HTMLElement) {
-    const { top, left, width, height } = wrapper.getBoundingClientRect();
-    const margin = 10;
-
-    const styles: React.CSSProperties = {
-        width: `${width}px`,
-        left: `${left}px`,
-    };
-
-    if (top + height / 2 > window.innerHeight / 2) {
-        styles.bottom = `${window.innerHeight - (top - margin)}px`;
-    } else {
-        styles.top = `${top + height + margin}px`;
-    }
-
-    return styles;
 }
 
-function Select(props: SelectProps) {
+interface SelectProps
+    extends Omit<JSX.IntrinsicElements["input"], "size" | "onChange">,
+        MultipleSizeElement {
+    options?: Option[];
+    onChange?: (value: JSX.IntrinsicElements["input"]["value"]) => void;
+}
+
+function BaseSelect(props: SelectProps) {
     const {
-        defaultValue,
+        "aria-invalid": ariaInvalid,
+        "aria-describedby": ariaDescribedBy,
         value,
+        defaultValue,
         onChange,
-        multiple,
-        className,
-        variant,
-        size,
-        invalid,
-        placeholder,
         options = [],
+        size = "md",
+        placeholder,
+        required,
+        disabled,
+        name,
+        className,
+        id,
         ...rest
     } = props;
 
@@ -90,6 +44,7 @@ function Select(props: SelectProps) {
     const [uncontrolledValue, setUncontrolledValue] =
         React.useState(defaultValue);
 
+    const isInvalid = ariaInvalid && ariaInvalid === "true";
     const isControlled = !!value;
     const currentValue = isControlled ? value : uncontrolledValue;
     const selectedOption = options.find(
@@ -100,8 +55,8 @@ function Select(props: SelectProps) {
         const handler = (e: PointerEvent) => {
             if (
                 !wrapperRef.current ||
-                wrapperRef.current.contains(e.target as Node) || 
-                !menuRef.current || 
+                wrapperRef.current.contains(e.target as Node) ||
+                !menuRef.current ||
                 menuRef.current.contains(e.target as Node)
             )
                 return;
@@ -144,7 +99,7 @@ function Select(props: SelectProps) {
         }
 
         if (selectedOptionIndex !== -1 && menuRef.current) {
-            keepVisible(
+            scrollToOption(
                 menuRef.current,
                 optionsRef.current[selectedOptionIndex],
                 { margin: 50 }
@@ -153,12 +108,10 @@ function Select(props: SelectProps) {
     }, [isMenuOpened, currentValue]);
 
     const handleSelect = (option: Option) => {
-        if (isControlled) {
-            onChange?.(option.value);
-        } else {
+        if (!isControlled) {
             setUncontrolledValue(option.value);
         }
-
+        onChange?.(option.value);
         setIsMenuOpened(false);
     };
 
@@ -191,7 +144,7 @@ function Select(props: SelectProps) {
                     ? Math.min(activeIndex + 1, options.length - 1)
                     : Math.max(0, activeIndex - 1);
             setActiveIndex(newActiveIndex);
-            keepVisible(menuRef.current, optionsRef.current[newActiveIndex]);
+            scrollToOption(menuRef.current, optionsRef.current[newActiveIndex]);
         }
 
         if (e.key === "Escape") {
@@ -199,16 +152,43 @@ function Select(props: SelectProps) {
         }
     };
 
+    const handleChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+        const option = options.find(({ value }) => e.target.value === value);
+
+        if (!option) return;
+
+        if (!isControlled) {
+            setUncontrolledValue(option.value);
+        }
+
+        onChange?.(option.value);
+    };
+
     return (
         <div className="relative">
             <div
-                className={select({ className, variant, size, invalid })}
                 tabIndex={0}
+                role="button"
+                aria-expanded={isMenuOpened ? "true" : "false"}
+                aria-invalid={ariaInvalid}
+                aria-describedby={ariaDescribedBy}
+                aria-haspopup="listbox"
+                id={id}
                 ref={wrapperRef}
                 onPointerDown={() => setIsMenuOpened(!isMenuOpened)}
                 onKeyDown={handleKeyDown}
+                className={clsx(
+                    "inline-flex items-center cursor-pointer rounded-base border border-gray-300 outline-none focus:border-gray-700 transition-all relative z-[1]",
+                    isInvalid && "border-red-600 focus:border-red-600",
+                    {
+                        "h-8 text-sm": size === "sm",
+                        "h-10 text-md": size === "md",
+                        "h-12 text-lg": size === "lg",
+                    },
+                    className
+                )}
             >
-                <div>
+                <div className="flex-grow px-3">
                     {selectedOption ? (
                         <div className="text-gray-700 select-none">
                             {selectedOption.label}
@@ -220,7 +200,9 @@ function Select(props: SelectProps) {
                     )}
                 </div>
 
-                <div className="ml-auto">
+                <div
+                    className="h-full px-3 flex items-center text-xl"
+                >
                     <CaretIcon />
                 </div>
             </div>
@@ -230,7 +212,8 @@ function Select(props: SelectProps) {
                     <div
                         style={getMenuStyles(wrapperRef.current)}
                         ref={menuRef}
-                        className="fixed w-full border border-gray-200 bg-white shadow rounded max-h-[200px] overflow-y-auto"
+                        role="menu"
+                        className="fixed w-full bg-white shadow-base rounded max-h-[200px] overflow-y-auto rounded-base"
                     >
                         {options.map((option, index) => {
                             return (
@@ -241,12 +224,18 @@ function Select(props: SelectProps) {
                                     }
                                     key={option.value}
                                     className={clsx(
-                                        "px-2 py-1 cursor-pointer aria-selected:bg-blue-100 text-sm",
+                                        "px-3 py-3 cursor-pointer aria-selected:bg-gray-100",
+                                        {
+                                            "text-sm": size === "sm",
+                                            "text-md": size === "md",
+                                            "text-lg": size === "lg",
+                                        },
                                         activeIndex === index && "bg-gray-100"
                                     )}
                                     aria-selected={
                                         option.value === currentValue
                                     }
+                                    role="menuitem"
                                     onClick={() => handleSelect(option)}
                                     onMouseMove={() => setActiveIndex(index)}
                                 >
@@ -259,14 +248,19 @@ function Select(props: SelectProps) {
             </Portal>
 
             <input
-                defaultValue={currentValue}
+                aria-hidden="true"
+                value={currentValue || ""}
                 onFocus={() => wrapperRef.current?.focus()}
                 tabIndex={-1}
-                className="absolute w-1 h-1 opacity-0 inset-2/4 overflow-hidden"
+                disabled={disabled}
+                className="absolute w-full opacity-0 overflow-hidden bottom-0 left-0"
+                required={required}
+                name={name}
+                onChange={handleChange}
                 {...rest}
             />
         </div>
     );
 }
 
-export default Select;
+export default BaseSelect;

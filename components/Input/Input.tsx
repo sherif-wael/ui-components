@@ -1,89 +1,54 @@
-import { cva, type VariantProps } from "class-variance-authority";
+import React, { useId } from "react";
+import FormItem, { FormItemProps, getErrorMsgId } from "@components/FormItem";
+import clsx from "clsx";
+import { fontStyles, sizeStyles } from "@lib/styles";
 
-const input = cva(
-    "disabled:cursor-not-allowed transition-all duration-300 w-full inline-block text-gray-700 relative z-[1]",
-    {
-        variants: {
-            variant: {
-                unstyled: "outline-none focus:outline-none active:outline-none",
-                outline:
-                    "px-2 rounded border border-gray-200 hover:border-gray-300 outline-none outline-offset-1 focus:outline-blue-400",
-            },
-            size: {
-                sm: "h-8 text-sm",
-                md: "h-10 text-md",
-                lg: "h-12 text-lg",
-            },
-            invalid: {
-                true: "",
-            },
-            leftAddon: {
-                true: "rounded-l-[0]",
-            },
-            rightAddon: {
-                true: "rounded-r-[0]"
-            },
-        },
-        compoundVariants: [
-            {
-                variant: "outline",
-                invalid: true,
-                className: "border-red-400 focus:outline-red-400",
-            },
-        ],
-        defaultVariants: {
-            size: "md",
-            variant: "outline",
-        },
-    }
-);
+type Omitted = "size" | "prefix" | "suffix";
 
-type InputProps = JSX.IntrinsicElements["input"] &
-    Omit<VariantProps<typeof input>, "invalid" | "leftAddon" | "rightAddon"> & {
-        leftAddon?: React.ReactNode;
-        rightAddon?: React.ReactNode;
-        invalid?: boolean;
-    };
+export interface InputProps
+    extends Omit<React.ComponentProps<"input">, Omitted>,
+        FormItemProps {
+    prefix?: React.ReactNode;
+    suffix?: React.ReactNode;
+}
 
 function Input(props: InputProps) {
-    const {
-        variant,
-        size,
-        className,
-        leftAddon,
-        rightAddon,
-        invalid,
-        ...rest
-    } = props;
+    const { label, error, size, id, prefix, suffix, className, ...rest } =
+        props;
+    const inputId = id || useId();
+    const isInvalid = !!props.error;
 
     return (
-        <div className="flex text-gray-700">
-            {
-                leftAddon &&
-                <div className="inline-flex items-center justify-center px-2 rounded-l bg-gray-200">
-                    {leftAddon}
-                </div>
-            }
+        <FormItem id={inputId} label={props.label} error={props.error}>
+            <div className={clsx("flex", sizeStyles({ size }))}>
+                {prefix && (
+                    <div className="flex items-center justify-center px-3 rounded-l-base text-gray-600 bg-gray-50 border border-gray-300 border-r-0">
+                        {prefix}
+                    </div>
+                )}
 
-            <input
-                className={input({
-                    variant,
-                    size,
-                    invalid,
-                    className,
-                    leftAddon: !!leftAddon,
-                    rightAddon: !!rightAddon,
-                })}
-                {...rest}
-            />
+                <input
+                    className={clsx(
+                        "text-inherit relative z-[1] px-3 border border-gray-300 outline-none focus:border-gray-700 hover:border-gray= transition-all",
+                        isInvalid && "border-red-600 focus:border-red-600",
+                        "disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed",
+                        !prefix && "rounded-l-base",
+                        !suffix && "rounded-r-base",
+                        className
+                    )}
+                    id={inputId}
+                    aria-invalid={isInvalid ? "true" : "false"}
+                    aria-describedby={getErrorMsgId(inputId)}
+                    {...rest}
+                />
 
-            {
-                rightAddon &&
-                <div className="inline-flex items-center justify-center px-2 rounded-r bg-gray-200">
-                    {rightAddon}
-                </div>
-            }
-        </div>
+                {suffix && (
+                    <div className="flex items-center justify-center px-3 rounded-r-base text-gray-600 bg-gray-50 border border-gray-300 border-l-0">
+                        {suffix}
+                    </div>
+                )}
+            </div>
+        </FormItem>
     );
 }
 
